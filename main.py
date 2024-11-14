@@ -148,4 +148,24 @@ async def rank(ctx, member: discord.Member = None):
     level = user_data.get(user_id, {}).get("level", 0)
     await ctx.send(f"{member.mention} - Уровень: {level}, XP: {xp}")
 
+@bot.command()
+async def leaderboard(ctx, top_n: int = 10):
+    """Показывает топ участников по уровням и XP"""
+    # Сортируем участников по уровню и XP
+    sorted_users = sorted(user_data.items(), key=lambda x: (x[1]["level"], x[1]["xp"]), reverse=True)
+
+    # Ограничиваем количество выводимых участников до `top_n`
+    top_users = sorted_users[:top_n]
+
+    # Формируем сообщение с топом участников
+    leaderboard_message = "**🏆 Топ участников по уровням 🏆**\n\n"
+    for rank, (user_id, data) in enumerate(top_users, start=1):
+        member = ctx.guild.get_member(int(user_id))  # Получаем объект участника по ID
+        if member:  # Проверяем, что участник есть на сервере
+            leaderboard_message += f"{rank}. {member.mention} - Уровень: {data['level']}, XP: {data['xp']}\n"
+
+    # Отправляем сообщение с таблицей лидеров
+    await ctx.send(leaderboard_message)
+
+
 bot.run(BOT_TOKEN)
