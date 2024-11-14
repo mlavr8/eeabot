@@ -1,5 +1,6 @@
 import os
 import io
+import json
 import discord
 import requests
 from discord.ext import commands
@@ -16,9 +17,36 @@ intents.members = True
 
 bot = commands.Bot(command_prefix=".", intents=intents)
 
-# Предварительная загрузка фонового изображения и шрифта для оптимизации
+# Предварительная загрузка фонового изображения и шрифта
 background_image = Image.open("welcomeeea.jpg")
 font = ImageFont.truetype("welcomefont.ttf", 90)
+
+# Определение уровня для каждой роли
+LEVEL_ROLES = {
+    5: 123456789012345678,  # ID роли для уровня 5
+    10: 234567890123456789,  # ID роли для уровня 10
+    15: 345678901234567890,  # ID роли для уровня 15
+}
+
+# Система уровней
+def calculate_level(xp):
+    return int((xp / 100) ** 0.5)  # Пример: уровень увеличивается каждые 100 XP
+
+# Загрузка данных из JSON-файла
+def load_data():
+    try:
+        with open("levels.json", "r") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {}
+
+# Сохранение данных в JSON-файл
+def save_data(data):
+    with open("levels.json", "w") as f:
+        json.dump(data, f, indent=4)
+
+# Загрузка данных пользователей
+user_data = load_data()
 
 @bot.event
 async def on_ready():
@@ -64,21 +92,43 @@ async def on_member_remove(member):
     if channel:
         await channel.send(f"Пользователь **{member.name}** покинул сервер")
 
-# Установите ID ролей, которым разрешен доступ к команде
-adm = [870045414856998912, 1158362465164328962, 1258722224890839090]
-ALLOWED_ROLES = [1158361900179017728, 870344875009257534]
+@bot.event
+async def on_message(message):
+    """Отслеживает сообщения для начисления XP и проверки уровня"""
+    if message.author.bot:
+        return
 
-@bot.slash_command(name='giverole', description='Выдача конкретной роли нескольким пользователям.')
-@commands.has_any_role(*ALLOWED_ROLES, *adm)
-async def giverole(ctx, role: discord.Role, member1: discord.Member, member2: discord.Member = None):
-    """Выдает указанную роль указанным пользователям"""
-    try:
-        await member1.add_roles(role)
-        if member2:
-            await member2.add_roles(role)
-        await ctx.send(f"Роль '{role.mention}' была выдана пользователям: {member1.mention}" +
-                       (f", {member2.mention}" if member2 else "") + ".")
-    except discord.Forbidden:
-        await ctx.send(f"У меня недостаточно прав для выдачи роли '{role.name}'.")
+    user_id = str(message.author.id)
+    user_data.setdefault(user_id, {"xp": 0, "level": 0})
+
+    # Начисляем XP
+    user_data[user_id]["xp"] += 10  # Пример: 10 XP за сообщение
+    new_level = calculate_level(user_data[user_id]["xp"])
+
+    # Проверяем, повысился ли уровень
+    if new_level > user_data[user_id]["level"]:
+        user_data[user_id]["level"] = new_level
+        await message.channel.send(f"{message.author.mention} достиг уровня {new_level}!")
+
+        # Проверяем, нужно ли выдать новую роль
+        if new_level in LEVEL_ROLES:
+            role = message.guild.get_role(LEVEL_ROLES[new_level])
+            if role:
+                await message.author.add_roles(role)
+                await message.channel.send(f"{message.author.mention} получил роль {role.name} за достижение уровня {new_level}!")
+
+    # Сохраняем данные
+    save_data(user_data)
+
+    await bot.process_commands(message)
+
+@bot.command()
+async def rank(ctx, member: discord.Member = None):
+    """Показывает уровень и XP пользователя"""
+    member = member or ctx.author
+    user_id = str(member.id)
+    xp = user_data.get(user_id, {}).get("xp", 0)
+    level = user_data.get(user_id, {}).get("level", 0)
+    await ctx.send(f"{member.mention} - Уровень: {level}, XP: {xp}")
 
 bot.run(BOT_TOKEN)
