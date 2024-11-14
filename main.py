@@ -2,20 +2,24 @@ import os
 import io
 import json
 import discord
-import requests
 from discord.ext import commands
+from discord_slash import SlashCommand, SlashContext
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 import aiohttp
 from dotenv import load_dotenv
 
+# Загрузка токена бота из .env файла
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
+# Настройка намерений (intents)
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 
+# Инициализация бота и SlashCommand
 bot = commands.Bot(command_prefix=".", intents=intents)
+slash = SlashCommand(bot, sync_commands=True)  # Инициализация поддержки slash-команд
 
 # Предварительная загрузка фонового изображения и шрифта
 background_image = Image.open("welcomeeea.jpg")
@@ -26,28 +30,12 @@ LEVEL_ROLES = {
     5: 123456789012345678,  # ID роли для уровня 5
     10: 234567890123456789,  # ID роли для уровня 10
     15: 345678901234567890,  # ID роли для уровня 15
-    20: 345678901234567890,
-    25: 345678901234567890,
-    30: 345678901234567890,
-    35: 345678901234567890,
-    40: 345678901234567890,
-    45: 345678901234567890,
-    50: 345678901234567890,
-    55: 345678901234567890,
-    60: 345678901234567890,
-    65: 345678901234567890,
-    70: 345678901234567890,
-    75: 345678901234567890,
-    80: 345678901234567890,
-    85: 345678901234567890,
-    90: 345678901234567890,
-    95: 345678901234567890,
-    100: 345678901234567890,
+    # Добавьте остальные уровни и их роли по аналогии
 }
 
 # Система уровней
 def calculate_level(xp):
-    return int((xp / 180) ** 0.55)  # Пример: уровень увеличивается каждые 100 XP
+    return int((xp / 180) ** 0.55)  # Формула для расчета уровня
 
 # Загрузка данных из JSON-файла
 def load_data():
@@ -139,8 +127,8 @@ async def on_message(message):
 
     await bot.process_commands(message)
 
-@bot.command()
-async def rank(ctx, member: discord.Member = None):
+@slash.slash(name='rank', description='Показывает уровень и XP пользователя')
+async def rank(ctx: SlashContext, member: discord.Member = None):
     """Показывает уровень и XP пользователя"""
     member = member or ctx.author
     user_id = str(member.id)
@@ -148,36 +136,8 @@ async def rank(ctx, member: discord.Member = None):
     level = user_data.get(user_id, {}).get("level", 0)
     await ctx.send(f"{member.mention} - Уровень: {level}, XP: {xp}")
 
-@bot.slash_command(name='rank', description='Показывает уровень и XP пользователя')
-async def rank(ctx, member: discord.Member = None):
-    """Показывает уровень и XP пользователя"""
-    member = member or ctx.author
-    user_id = str(member.id)
-    xp = user_data.get(user_id, {}).get("xp", 0)
-    level = user_data.get(user_id, {}).get("level", 0)
-    await ctx.send(f"{member.mention} - Уровень: {level}, XP: {xp}")
-
-@bot.command()
-async def leaderboard(ctx, top_n: int = 10):
-    """Показывает топ участников по уровням и XP"""
-    # Сортируем участников по уровню и XP
-    sorted_users = sorted(user_data.items(), key=lambda x: (x[1]["level"], x[1]["xp"]), reverse=True)
-
-    # Ограничиваем количество выводимых участников до `top_n`
-    top_users = sorted_users[:top_n]
-
-    # Формируем сообщение с топом участников
-    leaderboard_message = "**🏆 Топ участников по уровням 🏆**\n\n"
-    for rank, (user_id, data) in enumerate(top_users, start=1):
-        member = ctx.guild.get_member(int(user_id))  # Получаем объект участника по ID
-        if member:  # Проверяем, что участник есть на сервере
-            leaderboard_message += f"{rank}. {member.mention} - Уровень: {data['level']}, XP: {data['xp']}\n"
-
-    # Отправляем сообщение с таблицей лидеров
-    await ctx.send(leaderboard_message)
-
-@bot.slash_command(name='leaderboard', description='Показывает топ участников по уровням и XP')
-async def leaderboard(ctx, top_n: int = 10):
+@slash.slash(name='leaderboard', description='Показывает топ участников по уровням и XP')
+async def leaderboard(ctx: SlashContext, top_n: int = 10):
     """Показывает топ участников по уровням и XP"""
     sorted_users = sorted(user_data.items(), key=lambda x: (x[1]["level"], x[1]["xp"]), reverse=True)
     top_users = sorted_users[:top_n]
