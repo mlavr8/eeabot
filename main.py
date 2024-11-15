@@ -136,16 +136,23 @@ async def rank(ctx: SlashContext, member: discord.Member = None):
     level = user_data.get(user_id, {}).get("level", 0)
     await ctx.send(f"{member.mention} - Уровень: {level}, XP: {xp}")
 
-@slash.slash(name='leaderboard', description='Показывает топ участников по уровням и XP')
-async def leaderboard(ctx: SlashContext, top_n: int = 10):
+@bot.slash_command(name='leaderboard', description='Показывает топ участников по уровням и XP')
+async def leaderboard(ctx, top_n: int = 10):
     """Показывает топ участников по уровням и XP"""
     sorted_users = sorted(user_data.items(), key=lambda x: (x[1]["level"], x[1]["xp"]), reverse=True)
     top_users = sorted_users[:top_n]
-    leaderboard_message = "**🏆 Топ участников по уровням 🏆**\n\n"
+
+    embed = discord.Embed(title="🏆 Топ участников по уровням 🏆", color=discord.Color.white()) # Можно выбрать другой цвет
+
+    description = ""
     for rank, (user_id, data) in enumerate(top_users, start=1):
         member = ctx.guild.get_member(int(user_id))
         if member:
-            leaderboard_message += f"{rank}. {member.mention} - Уровень: {data['level']}, XP: {data['xp']}\n"
-    await ctx.send(leaderboard_message)
+            description += f"{rank}. {member.mention} - Уровень: {data['level']}, XP: {data['xp']}\n"
 
+    embed.description = description
+    embed.set_footer(text=f"Показано топ {top_n} игроков") # Добавлен футер
+
+
+    await ctx.respond(embed=embed)
 bot.run(BOT_TOKEN)
